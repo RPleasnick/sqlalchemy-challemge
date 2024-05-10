@@ -7,12 +7,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 
 import datetime as dt
+import pandas as pd
 
 
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite+pysqlite:///SurfsUp/Resources/hawaii.sqlite")
+
+# import os
+# print(os.getcwd())
+
+engine = create_engine(r"sqlite+pysqlite:///Resources/hawaii.sqlite")
 
 # reflect an existing database into a new model
 Base = automap_base()
@@ -38,19 +43,19 @@ app = Flask(__name__)
 # route for Homepage
 @app.route("/")
 def welcome():
-    """List all available api routes."""
+    # """List all available api routes."""
     return (
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        # f"/api/v1.0/<start><br/>"
-        # f"/api/v1.0/<start>/<end><br/>"
+        f"/api/v1.0/startYYYY-MM-DD<start><br/>"
+        f"/api/v1.0/startYYYY-MM-DD<start>/endYYYY-MM-DD<end><br/>"
     )
 
 #route for precipitation
 @app.route("/api/v1.0/precipitation")
-def precipitation_data():
+def precipitation_route():
     session = Session(engine)
 
    # Find the most recent date in the data set.
@@ -76,11 +81,11 @@ def precipitation_data():
 
 #route for stations
 @app.route("/api/v1.0/stations")
-def station_list():
+def station_route():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all stations"""
+    # """Return a list of all stations"""
     # Query all passengers
     results = session.query(Station.station).all()
 
@@ -89,16 +94,20 @@ def station_list():
     # Convert list of tuples into normal list
     stations = list(results)
 
-    return jsonify(stations)
+    station_list =[]
+    for item in stations:
+        station_list.append(item[0])
+    
+    return jsonify(station_list)
 
 
 #route for tobs
 @app.route("/api/v1.0/tobs")
-def station_list():
+def tobs_route():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return dates and temperatures of the most active station"""
+    # """Return dates and temperatures of the most active station"""
     # Design a query to find the most active stations (i.e. which stations have the most rows?)
     # Find the most active station.
     most_active = session.query((Measurement.station), func.count(Measurement.station)).group_by(Measurement.station) \
@@ -118,7 +127,46 @@ def station_list():
         most_active_dict[result[0]] = result[1] # result[0]=date, result[1]=temp
 
     
-    return jsonify(tobs_dates)
+    return jsonify(most_active_dict)
+
+
+#route for temperature stats for given date 
+@app.route("/api/v1.0/start<start>")
+def start_date_route(start):
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    # """Return temperature min, ave, and max"""
+    date_stats = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
+        .filter(Measurement.date == start).all()
+    
+    session.close()
+
+    # Create a dictionary
+    date_stats_dict = {
+        'Min': date_stats[0][0],
+        'Avg': date_stats[0][1],
+        'Max': date_stats[0][2]
+    }
+    return jsonify(date_stats_dict)
+
+#route for temperature stats for given date range
+@app.route('/api/v1.0/start<start>/end<end>')
+def range_date_route(start, end):
+    session = Session(engine)
+
+    date_stats = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
+    .filter(Measurement.date >= start, Measurement.date <= end).all()
+    
+    session.close()
+
+    # Create a dictionary
+    range_stats_dict = {
+        'Min': date_stats[0][0],
+        'Avg': date_stats[0][1],
+        'Max': date_stats[0][2]
+    }
+    return jsonify(range_stats_dict)
 
 
 
